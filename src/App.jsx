@@ -20,27 +20,37 @@ export default function RegaloSorpresa() {
 
   const [opciones, setOpciones] = useState([]);
   const [seleccion, setSeleccion] = useState(null);
-  const [contador, setContador] = useState(0);
+  const [cooldownRestante, setCooldownRestante] = useState(0);
   const [fechaActual, setFechaActual] = useState(new Date());
 
   useEffect(() => {
     const mezcladas = [...opcionesBase].sort(() => Math.random() - 0.5);
     setOpciones(mezcladas);
+
+    const storedUnlock = localStorage.getItem('unlockTime');
+    if (storedUnlock) {
+      const unlockTime = new Date(parseInt(storedUnlock));
+      const diff = Math.floor((unlockTime - new Date()) / 1000);
+      if (diff > 0) setCooldownRestante(diff);
+    }
   }, []);
 
-  const fechaActivacion = new Date('2025-11-09T15:00:00Z');
+  useEffect(() => {
+    if (cooldownRestante > 0) {
+      const interval = setInterval(() => {
+        setCooldownRestante((prev) => Math.max(0, prev - 1));
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [cooldownRestante]);
 
   useEffect(() => {
     const timer = setInterval(() => setFechaActual(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (contador > 0) {
-      const timer = setInterval(() => setContador((c) => c - 1), 1000);
-      return () => clearInterval(timer);
-    }
-  }, [contador]);
+  const fechaActivacion = new Date('2025-11-09T15:00:00Z');
+  const esActivaOpcion11 = fechaActual >= fechaActivacion;
 
   const formatoTiempo = (segundos) => {
     const h = Math.floor(segundos / 3600);
@@ -49,7 +59,12 @@ export default function RegaloSorpresa() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const esActivaOpcion11 = fechaActual >= fechaActivacion;
+  const handleVolver = () => {
+    setSeleccion(null);
+    const unlock = new Date(Date.now() + 24 * 3600 * 1000);
+    localStorage.setItem('unlockTime', unlock.getTime().toString());
+    setCooldownRestante(24 * 3600);
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 to-pink-200 p-4 text-center">
@@ -72,18 +87,17 @@ export default function RegaloSorpresa() {
                 <Button
                   key={op.id}
                   className={`w-full text-white ${estiloExtra}`}
-                  onClick={() => contador === 0 && setSeleccion(op)}
-                  disabled={contador > 0}
+                  onClick={() => cooldownRestante === 0 && setSeleccion(op)}
+                  disabled={cooldownRestante > 0}
                 >
                   {op.titulo}
                 </Button>
               );
             })}
           </div>
-          {contador > 0 && (
+          {cooldownRestante > 0 && (
             <p className="mt-4 text-sm text-gray-700">
-              Vaya, pues resulta que tampoco era ese el regalo. Pero no os preocupéis, podréis elegir otra opción pronto, exactamente en {formatoTiempo(contador)}.
-              Podéis verlo como una especie de calendario de adviento digital-bodil. ¡Buena suerte!
+              Podrás elegir otra opción en {formatoTiempo(cooldownRestante)}.
             </p>
           )}
         </motion.div>
@@ -95,10 +109,7 @@ export default function RegaloSorpresa() {
               <p className="text-gray-700 whitespace-pre-line">{seleccion.descripcion}</p>
               <Button
                 className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white"
-                onClick={() => {
-                  setSeleccion(null);
-                  setContador(86400);
-                }}
+                onClick={handleVolver}
               >
                 Volver al menú principal
               </Button>
